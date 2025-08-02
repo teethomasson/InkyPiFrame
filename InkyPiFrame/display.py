@@ -5,6 +5,13 @@ import os
 from PIL import Image
 from inky.auto import auto
 
+# Add this import and registration for HEIC support
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    print("Warning: pillow-heif not installed. HEIC images will not be supported.")
+
 def display_image(image_path):
 
     try:
