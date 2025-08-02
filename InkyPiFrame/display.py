@@ -47,10 +47,10 @@ def display_image(image_path):
         print(f"Error displaying image: {e}")
         return False
 
-    if __name__ == "__main__":
-        if len(sys.argv) != 2:
-           print("Usage: python3 display_image.py <image_path>")
-           sys.exit(1)
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+       print("Usage: python3 display_image.py <image_path>")
+       sys.exit(1)
 
     image_path = sys.argv[1]
     success = display_image(image_path)
