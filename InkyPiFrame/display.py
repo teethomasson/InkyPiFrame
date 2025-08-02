@@ -9,7 +9,7 @@ def display_image(image_path):
 
     try:
         inky_display = auto(ask_user=True, verbose=True)
-        print(f"Detected display: {inky_display.display_name}")
+        print(f"Detected display: {inky_display.width} x {inky_display.height}")
 
         if not os.path.exists(image_path):
             print(f"Image file not found: {image_path}")
