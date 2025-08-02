@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import sys
 import os
 from PIL import Image
@@ -26,7 +28,7 @@ def display_image(image_path):
         #Resize
         new_width = int(image.width * scale)
         new_height = int(image.height * scale)
-        image = image.resize((new_width, new_height), Image.Resampling.LANCZAOS)
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
         #Create a new image with the display dimensions and paste the resized image
         display_image = Image.new('RGB', (display_width, display_height), (255, 255, 255))
