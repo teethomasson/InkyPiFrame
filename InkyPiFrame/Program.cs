@@ -61,7 +61,7 @@ public class Program
             Console.WriteLine("Fetching random photo from Immich...");
 
             // Get random assets from Immich
-            var randomAssets = await GetRandomAssets(1);
+            var randomAssets = await GetRandomAssets(10); // Fetch more to increase chance of finding a photo
 
             if (randomAssets == null || !randomAssets.Any())
             {
@@ -69,11 +69,22 @@ public class Program
                 return;
             }
 
-            var asset = randomAssets.First();
-            Console.WriteLine($"Selected photo: {asset.OriginalFileName} ({asset.Id})");
+            // Filter out .MOV files and videos
+            var photoAsset = randomAssets
+                .FirstOrDefault(a =>
+                    !a.OriginalFileName.EndsWith(".mov", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase));
+
+            if (photoAsset == null)
+            {
+                Console.WriteLine("No suitable photo found (all were videos or .MOV files)");
+                return;
+            }
+
+            Console.WriteLine($"Selected photo: {photoAsset.OriginalFileName} ({photoAsset.Id})");
 
             // Download the photo
-            var imageData = await DownloadAsset(asset.Id);
+            var imageData = await DownloadAsset(photoAsset.Id);
 
             if (imageData == null)
             {
