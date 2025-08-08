@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InkyPiFrame")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+958c3d92ec7d85c351a4a17cd6daa2c125278fa9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7fffa40d4274b835a9947bbb169579cafbcb2ab4")]
 [assembly: System.Reflection.AssemblyProductAttribute("InkyPiFrame")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InkyPiFrame")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

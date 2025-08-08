@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-from PIL import Image
+from PIL import Image, ExifTags
 from inky.auto import auto
 
 # Add this import and registration for HEIC support
@@ -11,6 +11,24 @@ try:
     pillow_heif.register_heif_opener()
 except ImportError:
     print("Warning: pillow-heif not installed. HEIC images will not be supported.")
+
+def auto_orient(image):
+    try:
+        exif = image._getexif()
+        if exif is not None:
+            for tag, value in exif.items():
+                tag_name = ExifTags.TAGS.get(tag, tag)
+                if tag_name == "Orientation":
+                    if value == 3:
+                        image = image.rotate(180, expand=True)
+                    elif value == 6:
+                        image = image.rotate(270, expand=True)
+                    elif value == 8:
+                        image = image.rotate(90, expand=True)
+                    break
+    except Exception:
+        pass
+    return image
 
 def display_image(image_path):
 
@@ -23,6 +41,7 @@ def display_image(image_path):
             return False
         
         image = Image.open(image_path)
+        image = auto_orient(image)
         print(f"Image loaded: {image_path} (size: {image.size}) ")
 
         display_width, display_height = inky_display.width, inky_display.height
