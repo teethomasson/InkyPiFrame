@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import sys
 import os
-import time
-import requests
 from PIL import Image, ExifTags
 from inky.auto import auto
-from signal import pause
 
-# Configuration
-IMMICH_URL = "http://10.0.1.41:30041"
-API_KEY = "Emwmkf7IzakSyEYJAM8FvZGhX27kNRQjydh0nagY"
-TEMP_IMAGE_PATH = "/tmp/current_frame.jpg"
-
-# Global state
-current_image = None
-current_rotation = 0
-landscape = True
+# Add this import and registration for HEIC support
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    print("Warning: pillow-heif not installed. HEIC images will not be supported.")
 
 def auto_orient(image):
     try:
@@ -35,117 +30,54 @@ def auto_orient(image):
         pass
     return image
 
-def fetch_random_photo():
-    headers = {"x-api-key": API_KEY}
-    max_attempts = 3
-    
-    for attempt in range(max_attempts):
-        try:
-            # Get random assets
-            resp = requests.get(f"{IMMICH_URL}/api/assets/random?count=1", headers=headers)
-            resp.raise_for_status()
-            assets = resp.json()
-            
-            if not assets:
-                print("No assets returned from Immich.")
-                return None
-                
-            asset = assets[0]
-            if asset["type"].upper() == "VIDEO" or asset["originalFileName"].lower().endswith((".mov", ".mp4")):
-                print(f"Skipping video asset: {asset['originalFileName']}")
-                continue
-                
-            # Use the download endpoint
-            img_resp = requests.get(f"{IMMICH_URL}/api/assets/download/{asset['id']}", headers=headers)
-            img_resp.raise_for_status()
-            
-            with open(TEMP_IMAGE_PATH, "wb") as f:
-                f.write(img_resp.content)
-            print(f"Successfully downloaded image: {asset['originalFileName']}")
-            return TEMP_IMAGE_PATH
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1}/{max_attempts} failed: {e}")
-            if attempt == max_attempts - 1:
-                print("Max attempts reached, giving up.")
-                return None
-            print("Retrying...")
-    
-    return None
-
 def display_image(image_path):
-    global current_image
+
     try:
-        current_image = Image.open(image_path)
-        display_and_show()
+        inky_display = auto(ask_user=True, verbose=True)
+        print(f"Detected display: {inky_display.width} x {inky_display.height}")
+
+        if not os.path.exists(image_path):
+            print(f"Image file not found: {image_path}")
+            return False
+        
+        image = Image.open(image_path)
+        image = auto_orient(image)
+        print(f"Image loaded: {image_path} (size: {image.size}) ")
+
+        display_width, display_height = inky_display.width, inky_display.height
+        print(f"Display size: {display_width},{display_height}")
+
+        scale_w = display_width / image.width
+        scale_h = display_height / image.height
+        scale = min(scale_w, scale_h)
+
+        #Resize
+        new_width = int(image.width * scale)
+        new_height = int(image.height * scale)
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        #Create a new image with the display dimensions and paste the resized image
+        display_image = Image.new('RGB', (display_width, display_height), (255, 255, 255))
+        paste_x = (display_width - new_width) // 2
+        paste_y = (display_height - new_height) // 2
+        display_image.paste(image, (paste_x, paste_y))
+
+        #Set the image on the display
+        inky_display.set_image(display_image)
+
+        print("Updating display...")
+        inky_display.show()
         return True
+
     except Exception as e:
         print(f"Error displaying image: {e}")
         return False
 
-def handle_button(button):
-    global current_image, current_rotation, landscape
-    print(f"Button {button} pressed")
-    
-    if button == 'A':  # Next photo
-        print("Fetching next photo...")
-        img_path = fetch_random_photo()
-        if img_path:
-            display_image(img_path)
-    elif button == 'B' and current_image:  # Rotate 90
-        current_rotation = (current_rotation + 90) % 360
-        current_image = current_image.rotate(90, expand=True)
-        display_and_show()
-    elif button == 'C' and current_image:  # Rotate 180
-        current_rotation = (current_rotation + 180) % 360
-        current_image = current_image.rotate(180, expand=True)
-        display_and_show()
-    elif button == 'D' and current_image:  # Toggle orientation
-        landscape = not landscape
-        display_and_show()
-
-def display_and_show():
-    global current_image, landscape
-    if not current_image:
-        return
-        
-    inky_display = auto(ask_user=True, verbose=True)
-    
-    # Set up button handling using Inky's built-in support
-    inky_display.set_button_callback(handle_button)
-    
-    display_width, display_height = inky_display.width, inky_display.height
-    
-    if not landscape:
-        display_width, display_height = display_height, display_width
-        
-    image = auto_orient(current_image)
-    scale = min(display_width / image.width, display_height / image.height)
-    new_size = (int(image.width * scale), int(image.height * scale))
-    image = image.resize(new_size, Image.Resampling.LANCZOS)
-    
-    display_image = Image.new('RGB', (display_width, display_height), (255, 255, 255))
-    paste_x = (display_width - new_size[0]) // 2
-    paste_y = (display_height - new_size[1]) // 2
-    display_image.paste(image, (paste_x, paste_y))
-    
-    inky_display.set_image(display_image)
-    inky_display.show()
-
 if __name__ == "__main__":
-    # If path provided, display that image
-    if len(sys.argv) > 1:
-        success = display_image(sys.argv[1])
-        sys.exit(0 if success else 1)
-    else:
-        # Otherwise, fetch initial photo and wait for button presses
-        img_path = fetch_random_photo()
-        if img_path:
-            display_image(img_path)
-        print("Ready for button input. Press Ctrl+C to exit.")
-        while True:
-            try:
-                time.sleep(1)
-            except KeyboardInterrupt:
-                print("\nExiting...")
-                break
+    if len(sys.argv) != 2:
+       print("Usage: python3 display_image.py <image_path>")
+       sys.exit(1)
+
+    image_path = sys.argv[1]
+    success = display_image(image_path)
+    sys.exit(0 if success else 1)
