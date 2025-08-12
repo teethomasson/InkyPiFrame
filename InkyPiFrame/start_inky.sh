@@ -8,4 +8,10 @@ source ~/.virtualenvs/pimoroni/bin/activate
 cd /home/tee/InkyPiFrame/InkyPiFrame
 
 # Start the InkyPiFrame application
-dotnet run Program.cs
+dotnet run --project InkyPiFrame.csproj &
+
+# Start the Python script for button handling
+python3 display.py &
+
+# Keep the script running
+wait
