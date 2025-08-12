@@ -7,6 +7,7 @@ from PIL import Image, ExifTags
 from inky.auto import auto
 from gpiozero import Button
 from signal import pause
+import requests
 
 # Add this import and registration for HEIC support
 try:
@@ -29,6 +30,10 @@ landscape = True
 image_folder = "/home/tee/photos"  # Change to your image folder
 image_paths = []
 current_index = 0
+
+IMMICH_URL = "http://10.0.1.41:30041"
+API_KEY = "Emwmkf7IzakSyEYJAM8FvZGhX27kNRQjydh0nagY"
+TEMP_IMAGE_PATH = "/tmp/current_frame.jpg"
 
 def auto_orient(image):
     try:
@@ -102,6 +107,32 @@ def load_image_list():
     )
     print(f"Found {len(image_paths)} images.")
 
+def fetch_random_photo():
+    headers = {"x-api-key": API_KEY}
+    try:
+        # Get a random asset
+        resp = requests.get(f"{IMMICH_URL}/api/assets/random?count=1", headers=headers)
+        resp.raise_for_status()
+        assets = resp.json()
+        if not assets:
+            print("No assets returned from Immich.")
+            return None
+        asset = assets[0]
+        if asset["type"].upper() == "VIDEO" or asset["originalFileName"].lower().endswith(".mov"):
+            print("Random asset is a video, skipping.")
+            return None
+        asset_id = asset["id"]
+        # Download the asset
+        img_resp = requests.get(f"{IMMICH_URL}/api/asset/file/{asset_id}", headers=headers)
+        img_resp.raise_for_status()
+        with open(TEMP_IMAGE_PATH, "wb") as f:
+            f.write(img_resp.content)
+        print(f"Downloaded image to {TEMP_IMAGE_PATH}")
+        return TEMP_IMAGE_PATH
+    except Exception as e:
+        print(f"Error fetching photo from Immich: {e}")
+        return None
+
 def load_next_photo():
     global current_image_path, current_image, current_rotation, current_index
     if not image_paths:
@@ -158,26 +189,20 @@ def display_and_show():
     inky_display.show()
 
 if __name__ == "__main__":
-    load_image_list()
-    if not image_paths:
-        print("No images found in folder.")
-        sys.exit(1)
-
-    current_index = 0
-    current_image_path = image_paths[current_index]
+    img_path = fetch_random_photo()
+    if not img_path:
+        print("Could not fetch initial photo from Immich.")
+        exit(1)
+    current_image_path = img_path
     current_image = Image.open(current_image_path)
     display_and_show()
-
-    # Setup buttons
     btn_a = Button(SW_A)
     btn_b = Button(SW_B)
     btn_c = Button(SW_C)
     btn_d = Button(SW_D)
-
     btn_a.when_pressed = load_next_photo
     btn_b.when_pressed = rotate_90
     btn_c.when_pressed = rotate_180
     btn_d.when_pressed = toggle_orientation
-
     print("Ready for button input. Press Ctrl+C to exit.")
     pause()
