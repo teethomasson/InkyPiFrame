@@ -12,11 +12,11 @@ IMMICH_URL = "http://10.0.1.41:30041"
 API_KEY = "Emwmkf7IzakSyEYJAM8FvZGhX27kNRQjydh0nagY"
 TEMP_IMAGE_PATH = "/tmp/current_frame.jpg"
 
-# Button GPIO pins
-SW_A = 5   # Next photo
-SW_B = 6   # Rotate 90
-SW_C = 16  # Rotate 180
-SW_D = 24  # Toggle orientation
+# Button GPIO pins (BCM numbering)
+SW_A = 12  # Next photo
+SW_B = 13  # Rotate 90
+SW_C = 20  # Rotate 180
+SW_D = 21  # Toggle orientation
 
 # Global state
 current_image = None
@@ -43,28 +43,40 @@ def auto_orient(image):
 
 def fetch_random_photo():
     headers = {"x-api-key": API_KEY}
-    try:
-        resp = requests.get(f"{IMMICH_URL}/api/assets/random?count=1", headers=headers)
-        resp.raise_for_status()
-        assets = resp.json()
-        
-        if not assets:
-            return None
+    max_attempts = 3
+    
+    for attempt in range(max_attempts):
+        try:
+            resp = requests.get(f"{IMMICH_URL}/api/assets/random?count=1", headers=headers)
+            resp.raise_for_status()
+            assets = resp.json()
             
-        asset = assets[0]
-        if asset["type"].upper() == "VIDEO" or asset["originalFileName"].lower().endswith(".mov"):
-            return None
+            if not assets:
+                print("No assets returned from Immich.")
+                return None
+                
+            asset = assets[0]
+            if asset["type"].upper() == "VIDEO" or asset["originalFileName"].lower().endswith((".mov", ".mp4")):
+                print(f"Skipping video asset: {asset['originalFileName']}")
+                continue
+                
+            asset_id = asset["id"]
+            img_resp = requests.get(f"{IMMICH_URL}/api/asset/file/{asset_id}", headers=headers)
+            img_resp.raise_for_status()
             
-        asset_id = asset["id"]
-        img_resp = requests.get(f"{IMMICH_URL}/api/asset/file/{asset_id}", headers=headers)
-        img_resp.raise_for_status()
-        
-        with open(TEMP_IMAGE_PATH, "wb") as f:
-            f.write(img_resp.content)
-        return TEMP_IMAGE_PATH
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+            with open(TEMP_IMAGE_PATH, "wb") as f:
+                f.write(img_resp.content)
+            print(f"Successfully downloaded image: {asset['originalFileName']}")
+            return TEMP_IMAGE_PATH
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Attempt {attempt + 1}/{max_attempts} failed: {e}")
+            if attempt == max_attempts - 1:
+                print("Max attempts reached, giving up.")
+                return None
+            print("Retrying...")
+            
+    return None
 
 def display_image(image_path):
     global current_image
