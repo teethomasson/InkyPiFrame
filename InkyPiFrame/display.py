@@ -1,26 +1,16 @@
 #!/usr/bin/env python3
 import sys
 import os
+import time
 import requests
 from PIL import Image, ExifTags
 from inky.auto import auto
-from gpiozero import Button
-from gpiozero.pins.mock import MockFactory
-from gpiozero import Device
 from signal import pause
 
 # Configuration
 IMMICH_URL = "http://10.0.1.41:30041"
 API_KEY = "Emwmkf7IzakSyEYJAM8FvZGhX27kNRQjydh0nagY"
 TEMP_IMAGE_PATH = "/tmp/current_frame.jpg"
-
-Device.pin_factory = None  # Reset any existing pin factory
-
-# Button GPIO pins (BCM numbering)
-SW_A = 12  # Next photo
-SW_B = 13  # Rotate 90
-SW_C = 20  # Rotate 180
-SW_D = 21  # Toggle orientation
 
 # Global state
 current_image = None
@@ -65,7 +55,7 @@ def fetch_random_photo():
                 print(f"Skipping video asset: {asset['originalFileName']}")
                 continue
                 
-            # Use the correct endpoint for downloading
+            # Use the download endpoint
             img_resp = requests.get(f"{IMMICH_URL}/api/assets/download/{asset['id']}", headers=headers)
             img_resp.raise_for_status()
             
@@ -93,29 +83,24 @@ def display_image(image_path):
         print(f"Error displaying image: {e}")
         return False
 
-def load_next_photo():
-    print("Fetching next photo...")
-    img_path = fetch_random_photo()
-    if img_path:
-        display_image(img_path)
-
-def rotate_90():
-    global current_image, current_rotation
-    if current_image:
+def handle_button(button):
+    global current_image, current_rotation, landscape
+    print(f"Button {button} pressed")
+    
+    if button == 'A':  # Next photo
+        print("Fetching next photo...")
+        img_path = fetch_random_photo()
+        if img_path:
+            display_image(img_path)
+    elif button == 'B' and current_image:  # Rotate 90
         current_rotation = (current_rotation + 90) % 360
         current_image = current_image.rotate(90, expand=True)
         display_and_show()
-
-def rotate_180():
-    global current_image, current_rotation
-    if current_image:
+    elif button == 'C' and current_image:  # Rotate 180
         current_rotation = (current_rotation + 180) % 360
         current_image = current_image.rotate(180, expand=True)
         display_and_show()
-
-def toggle_orientation():
-    global landscape
-    if current_image:
+    elif button == 'D' and current_image:  # Toggle orientation
         landscape = not landscape
         display_and_show()
 
@@ -125,6 +110,10 @@ def display_and_show():
         return
         
     inky_display = auto(ask_user=True, verbose=True)
+    
+    # Set up button handling using Inky's built-in support
+    inky_display.set_button_callback(handle_button)
+    
     display_width, display_height = inky_display.width, inky_display.height
     
     if not landscape:
@@ -144,26 +133,19 @@ def display_and_show():
     inky_display.show()
 
 if __name__ == "__main__":
-    # Set up buttons
-    try:
-        btn_a = Button(SW_A, pull_up=True)
-        btn_b = Button(SW_B, pull_up=True)
-        btn_c = Button(SW_C, pull_up=True)
-        btn_d = Button(SW_D, pull_up=True)
-        
-        btn_a.when_pressed = load_next_photo
-        btn_b.when_pressed = rotate_90
-        btn_c.when_pressed = rotate_180
-        btn_d.when_pressed = toggle_orientation
-    except Exception as e:
-        print(f"Error setting up buttons: {e}")
-    
     # If path provided, display that image
     if len(sys.argv) > 1:
         success = display_image(sys.argv[1])
         sys.exit(0 if success else 1)
     else:
         # Otherwise, fetch initial photo and wait for button presses
-        load_next_photo()
+        img_path = fetch_random_photo()
+        if img_path:
+            display_image(img_path)
         print("Ready for button input. Press Ctrl+C to exit.")
-        pause()
+        while True:
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                print("\nExiting...")
+                break
