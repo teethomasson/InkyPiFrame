@@ -4,6 +4,14 @@
 # Active python virtual environment
 source ~/.virtualenvs/pimoroni/bin/activate
 
+# Kill any existing Python processes
+pkill -f "python3 display.py"
+
+# Kill any existing dotnet processes
+pkill -f "dotnet run"
+
+# Wait a moment for processes to clean up
+sleep 2
 # Change to the InkyPiFrame directory
 cd /home/tee/InkyPiFrame/InkyPiFrame
 

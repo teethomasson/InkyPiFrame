@@ -5,12 +5,16 @@ import requests
 from PIL import Image, ExifTags
 from inky.auto import auto
 from gpiozero import Button
+from gpiozero.pins.mock import MockFactory
+from gpiozero import Device
 from signal import pause
 
 # Configuration
 IMMICH_URL = "http://10.0.1.41:30041"
 API_KEY = "Emwmkf7IzakSyEYJAM8FvZGhX27kNRQjydh0nagY"
 TEMP_IMAGE_PATH = "/tmp/current_frame.jpg"
+
+Device.pin_factory = None  # Reset any existing pin factory
 
 # Button GPIO pins (BCM numbering)
 SW_A = 12  # Next photo
@@ -47,6 +51,7 @@ def fetch_random_photo():
     
     for attempt in range(max_attempts):
         try:
+            # Get random assets
             resp = requests.get(f"{IMMICH_URL}/api/assets/random?count=1", headers=headers)
             resp.raise_for_status()
             assets = resp.json()
@@ -60,8 +65,8 @@ def fetch_random_photo():
                 print(f"Skipping video asset: {asset['originalFileName']}")
                 continue
                 
-            asset_id = asset["id"]
-            img_resp = requests.get(f"{IMMICH_URL}/api/asset/file/{asset_id}", headers=headers)
+            # Use the correct endpoint for downloading
+            img_resp = requests.get(f"{IMMICH_URL}/api/assets/download/{asset['id']}", headers=headers)
             img_resp.raise_for_status()
             
             with open(TEMP_IMAGE_PATH, "wb") as f:
@@ -75,7 +80,7 @@ def fetch_random_photo():
                 print("Max attempts reached, giving up.")
                 return None
             print("Retrying...")
-            
+    
     return None
 
 def display_image(image_path):
@@ -140,15 +145,18 @@ def display_and_show():
 
 if __name__ == "__main__":
     # Set up buttons
-    btn_a = Button(SW_A)
-    btn_b = Button(SW_B)
-    btn_c = Button(SW_C)
-    btn_d = Button(SW_D)
-    
-    btn_a.when_pressed = load_next_photo
-    btn_b.when_pressed = rotate_90
-    btn_c.when_pressed = rotate_180
-    btn_d.when_pressed = toggle_orientation
+    try:
+        btn_a = Button(SW_A, pull_up=True)
+        btn_b = Button(SW_B, pull_up=True)
+        btn_c = Button(SW_C, pull_up=True)
+        btn_d = Button(SW_D, pull_up=True)
+        
+        btn_a.when_pressed = load_next_photo
+        btn_b.when_pressed = rotate_90
+        btn_c.when_pressed = rotate_180
+        btn_d.when_pressed = toggle_orientation
+    except Exception as e:
+        print(f"Error setting up buttons: {e}")
     
     # If path provided, display that image
     if len(sys.argv) > 1:
